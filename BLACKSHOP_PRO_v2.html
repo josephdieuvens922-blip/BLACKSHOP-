@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ht">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BLACKSHOP PRO</title>
+<style>
+body{font-family:Arial,sans-serif;background:#f4f5f7;margin:0;padding:18px;color:#171717}.wrap{max-width:1000px;margin:auto}.card{background:#fff;border-radius:14px;padding:18px;margin:12px 0;box-shadow:0 2px 10px #0001}input{width:100%;box-sizing:border-box;padding:12px;margin:6px 0;border:1px solid #ddd;border-radius:9px}button{border:0;border-radius:9px;padding:11px 15px;background:#111;color:#fff;cursor:pointer;margin:4px}.danger{background:#b42318}.muted{color:#666}.hidden{display:none}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}.num{font-size:24px;font-weight:700;margin-top:6px}.tablewrap{overflow:auto}table{width:100%;border-collapse:collapse;background:#fff}th,td{padding:11px;border-bottom:1px solid #eee;text-align:left;white-space:nowrap}th{background:#fafafa}.top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.error{color:#b42318}.ok{color:#087443}
+</style>
+</head>
+<body>
+<div class="wrap">
+<section id="login" class="card">
+<h1>🔐 BLACKSHOP</h1><p class="muted">Konekte sou kont BLACKSHOP ou.</p>
+<input id="email" type="email" placeholder="Email">
+<input id="password" type="password" placeholder="Modpas">
+<button type="button" id="loginBtn">Konekte</button><button type="button" id="signupBtn">Kreye kont</button>
+<p id="loginMsg" class="error"></p><p id="jsStatus" class="muted">Sistèm nan ap chaje…</p>
+</section>
+
+<section id="app" class="hidden">
+<div class="top"><div><h1>🔥 BLACKSHOP</h1><div id="userLabel" class="muted"></div></div><button id="logoutBtn">Déconnexion</button></div>
+<div class="cards">
+<div class="card">Kapital stock<div class="num" id="capital">0 HTG</div></div>
+<div class="card">Lavant total<div class="num" id="sales">0 HTG</div></div>
+<div class="card">Pwofi<div class="num" id="profit">0 HTG</div></div>
+<div class="card">Stock ki rete<div class="num" id="items">0</div></div>
+</div>
+<div class="card"><h2>📦 Stock</h2><button id="addBtn">+ Ajoute pwodwi</button><div class="tablewrap"><table><thead><tr><th>Pwodwi</th><th>Pri acha TOTAL</th><th>Qte achte</th><th>Qte vann</th><th>Qte rete</th><th>Pri vann</th><th>Pwofi stock</th><th></th></tr></thead><tbody id="products"></tbody></table></div></div>
+<div class="card"><h2>🧾 Dènye vant</h2><div class="tablewrap"><table><thead><tr><th>Pwodwi</th><th>Pri vant</th><th>Pwofi</th><th>Dat</th></tr></thead><tbody id="saleslog"></tbody></table></div></div>
+<p id="appMsg" class="muted"></p>
+</section>
+</div>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script>
+const firebaseConfig={
+ apiKey:'AIzaSyBtcm9P7HPvGW8Q8Ce3twRGiDkWg__3s_U',
+ authDomain:'blackshop-20674.firebaseapp.com',
+ projectId:'blackshop-20674',
+ storageBucket:'blackshop-20674.firebasestorage.app',
+ messagingSenderId:'718385968907',
+ appId:'1:718385968907:web:832400d913b193968a940e'
+};
+const app=firebase.initializeApp(firebaseConfig),auth=firebase.auth(),db=firebase.firestore();
+const $=id=>document.getElementById(id), money=n=>Math.round(n)+' HTG'; $('jsStatus').textContent='BLACKSHOP pare. Mete email ak modpas ou.';
+let uid=null,products=[],sales=[];
+const productsRef=()=>db.collection('users').doc(uid).collection('products');
+const salesRef=()=>db.collection('users').doc(uid).collection('sales');
+function msg(t,ok=false){$('appMsg').textContent=t;$('appMsg').className=ok?'ok':'error'}
+function loginMsg(t){$('loginMsg').textContent=t}
+async function load(){products=[];sales=[];const ps=await productsRef().get(), ss=await salesRef().get();ps.forEach(x=>products.push({id:x.id,...x.data()}));ss.forEach(x=>sales.push({id:x.id,...x.data()}));render()}
+function render(){
+ const capital=products.reduce((s,p)=>s+(Number(p.totalCost)||0),0), totalSales=sales.reduce((s,x)=>s+(Number(x.price)||0),0);
+ const profit=sales.reduce((s,x)=>s+(Number(x.profit)||0),0),items=products.reduce((s,p)=>s+(Number(p.qty)||0),0);
+ $('capital').textContent=money(capital);$('sales').textContent=money(totalSales);$('profit').textContent=money(profit);$('items').textContent=items;
+ $('products').innerHTML=products.map((p,i)=>{const sold=(Number(p.purchased)||0)-(Number(p.qty)||0), unit=Number(p.totalCost)/Number(p.purchased),stockProfit=(Number(p.price)-unit)*Number(p.qty);return `<tr><td><b>${p.name}</b></td><td><b>${money(p.totalCost)}</b></td><td>${p.purchased}</td><td>${sold}</td><td>${p.qty}</td><td>${money(p.price)}</td><td>${money(stockProfit)}</td><td><button onclick="window.sellProduct(${i})">Vann 1</button></td></tr>`}).join('');
+ $('saleslog').innerHTML=sales.slice().reverse().map(x=>`<tr><td>${x.name}</td><td>${money(x.price)}</td><td>${money(x.profit)}</td><td>${x.date||''}</td></tr>`).join('');
+}
+window.sellProduct=async i=>{const p=products[i];if(p.qty<=0)return alert('Pa gen stock ki rete.');const price=Number(prompt(`Pri ou vann 1 ${p.name}?`,p.price));if(!price)return;const unit=Number(p.totalCost)/Number(p.purchased);await productsRef().doc(p.id).set({qty:Number(p.qty)-1},{merge:true});await salesRef().add({name:p.name,price,profit:price-unit,date:new Date().toLocaleDateString('fr-FR'),createdAt:firebase.firestore.FieldValue.serverTimestamp()});await load();msg('Vant an anrejistre.',true)};
+$('addBtn').onclick=async()=>{const name=prompt('Non pwodwi a:');if(!name)return;const qty=Number(prompt('Qte achte:','1'));if(!qty)return;const total=Number(prompt('Pri acha TOTAL pou tout kantite a:','0'));if(!total)return;const price=Number(prompt('Pri vann pou 1:','0'));if(!price)return;await productsRef().add({name,purchased:qty,qty,totalCost:total,price,createdAt:firebase.firestore.FieldValue.serverTimestamp()});await load();msg('Pwodwi a ajoute.',true)};
+$('loginBtn').onclick=async()=>{try{await auth.signInWithEmailAndPassword($('email').value.trim(),$('password').value)}catch(e){loginMsg('Email oswa modpas la pa bon.')}};
+$('signupBtn').onclick=async()=>{try{await auth.createUserWithEmailAndPassword($('email').value.trim(),$('password').value);loginMsg('Kont la kreye.',true)}catch(e){loginMsg('Pa t ka kreye kont la. Verifye email/modpas la.')}};
+$('logoutBtn').onclick=()=>auth.signOut();
+auth.onAuthStateChanged(async user=>{if(user){uid=user.uid;$('login').classList.add('hidden');$('app').classList.remove('hidden');$('userLabel').textContent=user.email;try{await load()}catch(e){msg('Firebase Security Rules yo poko pèmèt dashboard la. Mete règ mwen bay anba yo.')}}else{$('login').classList.remove('hidden');$('app').classList.add('hidden');uid=null}});
+</script>
+</body></html>
